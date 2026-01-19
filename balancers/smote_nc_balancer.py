@@ -10,7 +10,7 @@ from .base import SyntheticBalancer
 class SmoteNCBalancer(SyntheticBalancer):
     """SMOTE-NC implementation for datasets with categorical columns."""
 
-    def _resample(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _resample(self, df: pd.DataFrame):
         X = df.drop(columns=[self.target_col])
         y = df[self.target_col]
         cat_indices = self._get_categorical_indices(X)
@@ -24,7 +24,10 @@ class SmoteNCBalancer(SyntheticBalancer):
             [pd.DataFrame(X_res, columns=X.columns), pd.Series(y_res, name=self.target_col)],
             axis=1,
         )
-        return balanced
+        original_len = len(df)
+        mask = pd.Series(False, index=balanced.index)
+        mask.iloc[original_len:] = True
+        return balanced, mask
 
     def _get_categorical_indices(self, X: pd.DataFrame) -> list[int]:
         cat_cols = X.select_dtypes(include=['object', 'category']).columns

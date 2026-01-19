@@ -11,7 +11,7 @@ from .base import SyntheticBalancer
 class AdasynBalancer(SyntheticBalancer):
     """ADASYN implementation for numerical datasets."""
 
-    def _resample(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _resample(self, df: pd.DataFrame):
         X = df.drop(columns=[self.target_col])
         y = df[self.target_col]
         X_num = X.select_dtypes(include=['number'])
@@ -26,4 +26,7 @@ class AdasynBalancer(SyntheticBalancer):
             [pd.DataFrame(X_res, columns=X_num.columns), pd.Series(y_res, name=self.target_col)],
             axis=1,
         )
-        return balanced
+        original_len = len(df)
+        mask = pd.Series(False, index=balanced.index)
+        mask.iloc[original_len:] = True
+        return balanced, mask

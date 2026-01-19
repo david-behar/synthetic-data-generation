@@ -16,7 +16,7 @@ class CTGANBalancer(SyntheticBalancer):
         self.epochs = epochs
         self.verbose = verbose
 
-    def _resample(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _resample(self, df: pd.DataFrame):
         counts = df[self.target_col].value_counts()
         majority_class = counts.idxmax()
         minority_class = counts.idxmin()
@@ -25,7 +25,7 @@ class CTGANBalancer(SyntheticBalancer):
         missing_rows = target_count - current_minority_count
         if missing_rows <= 0:
             print('Classes already balanced.')
-            return df
+            return df.copy(), pd.Series(False, index=df.index)
         print(f"Training CTGAN to generate {missing_rows} new rows for class '{minority_class}'...")
         df_minority = df[df[self.target_col] == minority_class]
         metadata = SingleTableMetadata()
@@ -34,4 +34,6 @@ class CTGANBalancer(SyntheticBalancer):
         synthesizer.fit(df_minority)
         synthetic_data = synthesizer.sample(num_rows=missing_rows)
         synthetic_data[self.target_col] = minority_class
-        return pd.concat([df, synthetic_data], ignore_index=True)
+        combined = pd.concat([df, synthetic_data], ignore_index=True)
+        mask = pd.Series([False] * len(df) + [True] * len(synthetic_data), index=combined.index)
+        return combined, mask
