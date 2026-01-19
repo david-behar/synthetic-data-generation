@@ -5,6 +5,7 @@ Base class for Generative Imputation methods.
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
+from pandas.api.types import is_datetime64_any_dtype, is_datetime64tz_dtype
 from sklearn.preprocessing import OrdinalEncoder
 
 
@@ -31,6 +32,7 @@ class GenerativeImputer(ABC):
         self.scalers = {}
         self.numerical_cols = []
         self.categorical_cols = []
+        self.datetime_cols = []
         
     def _preprocess(self, df):
         """
@@ -42,11 +44,23 @@ class GenerativeImputer(ABC):
         Returns:
             Encoded DataFrame with numerical representations of categorical data
         """
-        df_encoded = df.copy()
+        self.encoders = {}
+        self.numerical_cols = []
+        self.categorical_cols = []
+        self.datetime_cols = []
+
+        # Track datetime columns so the imputation algorithms can safely skip them
+        for col in df.columns:
+            series = df[col]
+            if is_datetime64_any_dtype(series) or is_datetime64tz_dtype(series):
+                self.datetime_cols.append(col)
+
+        # Work on a copy that excludes datetime/timestamp columns entirely
+        df_encoded = df.drop(columns=self.datetime_cols, errors='ignore').copy()
         
-        # Identify types
-        self.numerical_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        self.categorical_cols = df.select_dtypes(exclude=[np.number]).columns.tolist()
+        # Identify types on the reduced frame
+        self.numerical_cols = df_encoded.select_dtypes(include=[np.number]).columns.tolist()
+        self.categorical_cols = df_encoded.select_dtypes(exclude=[np.number]).columns.tolist()
         
         # Encode Categoricals (Ordinal Encoding)
         # Strategy: We temporarily handle NaNs, encode, then put NaNs back.
@@ -88,6 +102,8 @@ class GenerativeImputer(ABC):
                 # Clip to valid range
                 df_out[col] = df_out[col].round().clip(0, len(encoder.categories_[0])-1)
                 df_out[col] = encoder.inverse_transform(df_out[[col]])
+
+        return df_out
         return df_out
 
     @abstractmethod
@@ -126,5 +142,10 @@ class GenerativeImputer(ABC):
         
         # 4. Inverse Transform (Decode Categoricals)
         df_final = self._inverse_transform(df_imputed)
+
+        # 5. Add back datetime columns (left untouched) and ensure original column order
+        for col in self.datetime_cols:
+            df_final[col] = df[col]
+        df_final = df_final[df.columns]
         
         return df_final
