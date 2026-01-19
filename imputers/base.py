@@ -101,9 +101,8 @@ class GenerativeImputer(ABC):
                 encoder = self.encoders[col]
                 # Clip to valid range
                 df_out[col] = df_out[col].round().clip(0, len(encoder.categories_[0])-1)
-                df_out[col] = encoder.inverse_transform(df_out[[col]])
+                df_out[col] = encoder.inverse_transform(df_out[[col]]).ravel()
 
-        return df_out
         return df_out
 
     @abstractmethod
